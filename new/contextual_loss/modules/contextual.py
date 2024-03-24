@@ -26,7 +26,9 @@ class ContextualLoss(nn.Module):
                  band_width: float = 0.5,
                  loss_type: str = 'cosine',
                  use_vgg: bool = False,
-                 vgg_layer: str = 'relu3_4'):
+                 vgg_layer1: str = 'relu3_4',
+                 vgg_layer2: str = None,
+                 vgg_layer3: str = None):
 
         super(ContextualLoss, self).__init__()
 
@@ -38,7 +40,9 @@ class ContextualLoss(nn.Module):
 
         if use_vgg:
             self.vgg_model = VGG19()
-            self.vgg_layer = vgg_layer
+            self.vgg_layer1 = vgg_layer1
+            self.vgg_layer2 = vgg_layer2
+            self.vgg_layer3 = vgg_layer3
             self.register_buffer(
                 name='vgg_mean',
                 tensor=torch.tensor(
@@ -60,7 +64,17 @@ class ContextualLoss(nn.Module):
             y = y.sub(self.vgg_mean.detach()).div(self.vgg_std.detach())
 
             # picking up vgg feature maps
-            x = getattr(self.vgg_model(x), self.vgg_layer)
-            y = getattr(self.vgg_model(y), self.vgg_layer)
-
-        return F.contextual_loss(x, y, self.band_width)
+            x1 = getattr(self.vgg_model(x), self.vgg_layer1)
+            y1 = getattr(self.vgg_model(y), self.vgg_layer1)
+            if self.vgg_layer2:
+                x2 = getattr(self.vgg_model(x), self.vgg_layer2)
+                y2 = getattr(self.vgg_model(y), self.vgg_layer2)
+            if self.vgg_layer3:
+                x3 = getattr(self.vgg_model(x), self.vgg_layer3)
+                y3 = getattr(self.vgg_model(y), self.vgg_layer3)
+            loss = F.contextual_loss(x1, y1, self.band_width)
+            if self.vgg_layer2:
+                loss += F.contextual_loss(x2, y2, self.band_width)
+            if self.vgg_layer3:
+                loss += F.contextual_loss(x3, y3, self.band_width)
+        return loss
